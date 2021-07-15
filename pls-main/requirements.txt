@@ -65,7 +65,7 @@ Pillow==8.0.1
 protobuf==3.13.0
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
-PyAudio==0.2.11
+python3-pyaudio
 pycparser==2.20
 pycryptodome==3.4.3
 PyDictionary==2.0.1
