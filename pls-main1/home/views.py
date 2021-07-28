@@ -1,0 +1,760 @@
+from django.shortcuts import render, redirect, HttpResponse
+from django.utils.safestring import mark_safe
+from ibmcloudant.cloudant_v1 import CloudantV1, Document
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+import random, string
+import requests
+
+def choose_category():
+    value = '''
+
+    <div class="received-chats old-chats"><div class="received-chats-img"><img src='static/home/img/avatar.png' alt="Avatar" class="avatar"></div>
+    <div class="received-msg"><div class="received-msg-inbox">
+
+    <p>
+    <span id="message-sender-id">Learning Specialist</span><br>
+    Welcome to IBM's PLS bot.
+    </p>
+
+    </div></div></div>
+
+    <div class="received-chats old-chats"><div class="received-chats-img"><img src='static/home/img/avatar.png' alt="Avatar" class="avatar"></div>
+    <div class="received-msg"><div class="received-msg-inbox">
+
+    <p>
+    <span id="message-sender-id">Learning Specialist</span><br>
+    Please select the category to continue <br><br>
+
+    <input type="checkbox" name="1" value="1" id='1' style="position: absolute;">
+    <label style="color:rgb(100,100,100);font-weight:normal; padding-left:1.4em;
+    display:inline-block;" for="1">Outdoor Classroom Experience</label><br>
+    <input type="checkbox" name="2" value="2"  style="position: absolute;">
+    <label style="color:rgb(100,100,100);font-weight:normal; padding-left:1.4em;
+    display:inline-block;" for="2">Under Lockdown</label><br>
+    <input type="checkbox" name="3" value="3"  style="position: absolute;">
+    <label style="color:rgb(100,100,100);font-weight:normal;padding-left:1.4em;
+    display:inline-block;" for="3">Rockclimbing</label><br><br>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#chckbx').click(function() {
+            checked = $("input[type=checkbox]:checked").length;
+
+            if(!checked) {
+                alert("You must choose atleast one scenario.");
+                return false;
+            }
+
+            });
+        });
+
+    </script>
+    
+    <button style="color:#ffffff; background: #88B2F0;font-weight:normal;" class="login-btn" type="submit" id="chckbx">Next</button>
+    </p>
+    </div></div></div>
+
+    '''
+    return value
+def get_data():
+
+    # CLOUDANT_USERNAME="apikey-v2-1mfs4kqo2nmnc2sdtgp9ji8myznbgm6mivk0o93pfopt"
+    # CLOUDANT_PASSWORD="f70c9a73c52d287d3271ddc3dba6a30a"
+    #
+    # authenticator = IAMAuthenticator("C8J8TcTL_T9YlMtyA6itWueAqAdkgGXbwOc8RA2omfCd")
+    # service = CloudantV1(authenticator=authenticator)
+    # service.set_service_url("https://apikey-v2-1mfs4kqo2nmnc2sdtgp9ji8myznbgm6mivk0o93pfopt:f70c9a73c52d287d3271ddc3dba6a30a@dc1a5ff5-996b-475c-8b7e-da87f4bf33a3-bluemix.cloudantnosqldb.appdomain.cloud")
+    # response = service.get_server_information().get_result()
+    #
+    # response = service.get_document(db='qdata', doc_id='001').get_result()
+
+    url = "https://api.npoint.io/c4b4edd3640ed8357987"
+
+    r = requests.get(url)
+    data = r.json()
+    print("data")
+
+    return data #response['data']
+def get_scene():
+    scene = {
+    '1':'Outdoor Classroom Experience',
+    '2':'Under Lockdown',
+    '3':'Rockclimbing'
+    }
+    return scene
+
+def home(request):
+    return render(request, 'home/home.html')
+
+def info(request):
+    request.session['responses'] = list('')
+    request.session['unanswered'] = list('')
+    request.session['ansd'] = list('')
+    request.session['ansd2'] = list('')
+    return render(request, 'home/info.html')
+
+def scenario(request):
+    if request.method == 'POST':
+        return render(request, 'home/quiz.html')
+
+    return render(request, 'home/scenario.html')
+
+def resultsPage(request):
+    responses = list(request.session['responses'])
+    responses = [i for i in responses if i != ['']]
+    responses = [i for i in responses if i != ['skip']]
+    responses = [i for i in responses if i != ['exit']]
+
+    res = [sum(i)/len(responses) for i in zip(*responses)]
+
+    ansd = list(request.session['ansd'])
+    ansd = [i for i in ansd if i != ['']]
+    ansd = [i for i in ansd if i != ['skip']]
+    ansd = [i for i in ansd if i != ['exit']]
+
+    tlist = []
+    data = get_data()
+
+    results = request.session['results']
+    n_s = len(results) # no of scenarios selected
+
+    for x in results:
+        q_data = data[x]
+        n = len(q_data)
+        for y in range(1, n+1):
+            tlist.append([x, y])
+
+    x, y = tlist, ansd
+
+    for i in x[:]:
+      if i in y:
+          x.remove(i)
+          y.remove(i)
+
+    unansd = tlist
+
+    # code = ' you have not answered the following <br> '
+
+    tp = []
+    un_sec = {} #unanswered sections
+    for i in unansd:
+        tp.append(int(i[0]))
+
+    tp = list(set(tp))
+
+    ##### finding lengths of tp
+    data = get_data()
+    leng = {}
+    for i in tp:
+        n = len(data[str(i)])
+        leng[str(i)] = n
+    #####
+
+    for i in tp:
+        # i is the section number
+        un_sec[str(i)] = []
+        for j in unansd:
+            if j[0] == str(i):
+                un_sec[str(i)].append(j[1])
+
+    uns_p = {}
+    for i in tp:
+        un_p = len(un_sec[str(i)]) / float(leng[str(i)])
+        un_p = int(un_p * 100)
+        uns_p[str(i)] = un_p
+
+    print(uns_p)
+
+    ##### Generarting code #####
+
+    code = '<br><br><br>'
+
+    for i in tp:
+        code = code + 'you have not answered ' + str(uns_p[str(i)]) + '% of section ' + str(str(i)) + '. Revisit? <input type="s0ubmit" class="login-btn" name="action" value="'+str(str(i))+'"> <br>'
+    code = code + '<br><br>'
+
+    return render(request, 'home/results.html', {'V':int(res[0]), 'A':int(res[1]), 'K':int(res[2]), 'code':mark_safe(code)})
+
+# Create your views here.
+
+
+def quiz(request):
+
+    if request.method == 'POST':
+        print("quiz if")
+        results = list(request.POST.keys())
+        print("Results : ",results)
+        # scenarios picked
+        results = results[1:]
+        print("Scenarios picked Results : ",results)
+        n_s = len(results)
+        # print(results)
+        request.session['results'] = results
+        request.session['s'] = 0
+        q_data = get_data()
+        print("q_data : ",q_data)
+        n = len(q_data)
+        request.session['c'] = 0
+        progress = 0
+        scene = get_scene()[(results[0])]
+        print("scene : ",scene)
+
+        return render(request, 'home/scenario.html', {'scene':scene, 's':int(1)})
+    else:
+        print("quiz else")
+        progress = 0
+        request.session['c'] = 0
+        code = choose_category()
+
+    return render(request, 'home/quiz.html', {'content': mark_safe(code), 'progress':progress, 'q':'Discover your learning style'})
+
+
+def quiz2(request):
+    try:
+        if request.POST['action']:
+            print("quiz2 first try if")
+            if request.POST['action'] == 'skip':
+                print("quiz2 first try if if")
+                request.session['s'] = 1
+                request.session['c'] += 1
+                c = request.session['c']
+                s = request.session['s']
+
+                results = list(request.session['results'])
+                data = get_data()
+                q_data = data[(results[s])]
+                code = '''
+                    <div class="">
+                    <div class=""><div class="">
+                    <p>
+                    <br>''' + q_data[str(int(c))]['q'] + '''
+                    <br><br>
+                    1. ''' + q_data[str(int(c))]['V'] + ''':<br><br>
+                         <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range" id="slider1" name="rangeInput1" min="0" max="100" value=0
+                                onchange="updateTextInput1(this.value);">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent1">0</span>%
+                            </div>
+                        </div>
+                        
+
+                      <br>
+                    2. ''' + q_data[str(int(c))]['A'] + ''':<br><br>
+                        <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range" id="slider2" name="rangeInput2" min="0" max="100" value=0
+                                onchange="updateTextInput2(this.value);" style="width:100%">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent2">0</span>%
+                            </div>
+                        </div>
+                    3. ''' + q_data[str(int(c))]['K'] + ''':<br><br>
+                        <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range"  id="slider3" name="rangeInput3" min="0" max="100" value=0
+                                onchange="updateTextInput3(this.value);">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent3">0</span>%
+                            </div>
+                        </div>
+
+                    <br>
+                    <input type="submit" value="Submit"  style="color:#ffffff; width:40%;  background: #88B2F0; display: inline-block;">
+                    </div>
+
+                    </p>
+                    </div></div></div>
+                    
+                    '''
+
+                exit = '''
+                    <input type="submit" name="action" value="skip"  style="color:#ffffff; margin-left: 10px; width:20%; background: #88B2F0; display: inline-block;">
+                     <input type="submit" name="action" value="exit"  style="color:#ffffff; width:20%; background: #88B2F0; display: inline-block;"> '''
+
+                print("quiz2 first try if if",request.session['s'],request.session['c'])
+                return render(request, 'home/quiz2.html', {'content': mark_safe(code), 'q':int(c), 'exit': mark_safe(exit)})
+                # if (s+1) == n_s:
+                #     print("quiz2 first try if if if s+1 == n_s")
+                #     return render(request, 'home/quiz.html')
+                    
+
+                # s = request.session['s']
+                # scene = get_scene()[(results[s])]
+                # print("quiz2 scene : ",scene)
+                # return render(request, 'home/scenario.html', {'scene':scene, 's':int(s+1)})
+
+            elif request.POST['action'] == 'exit':
+                return render(request, 'home/dummy.html')
+    except:
+        print("quiz2 first except a=0")
+        request.session['c'] = int(request.session['c']) + 1
+        a = 0
+
+    s = int(request.session['s'])
+    c = request.session['c']
+    responses = list(request.session['responses'])
+    results = list(request.session['results'])
+    print(responses,results,s,c)
+
+    try:
+        print("quiz2 try try ")
+        # print(request.POST.values())
+        answers = list(request.POST.values())
+        answers = answers[1:]
+
+        print(answers) 
+
+        if len(answers) != 1:
+            print("quiz2 try try if len(answers!=1")
+            answers = [int(float(i)) for i in answers]
+            print(answers)
+            if answers[0] == answers[1] == answers[2] == 0:
+                print("quiz2 try try if if an0=an1=an2=0")
+                unans = list(request.session['unanswered'])
+                li = [s, int(int(c)-1)]
+                unans.append(li)
+                request.session['unanswered'] = unans
+            else:
+                print("quiz2 try try if else")
+                ansd = list(request.session['ansd'])
+                li = [str(results[s]), int(int(c)-1)]####################!
+                ansd.append(li)
+                request.session['ansd'] = ansd
+                print("quiz2 try try if else ansd : ",ansd)
+
+
+                ansd2 = list(request.session['ansd2'])
+                li = [str(results[s]), int(int(c)-1)]####################!
+                ansd2.append(li)
+                request.session['ansd2'] = ansd2
+                print("quiz2 try try if else ansd2 : ",ansd2)
+
+        responses.append(answers)
+        request.session['responses'] = responses
+    except:
+        print("quiz2 second except V=0")
+        v=0
+    n_s = len(results)
+
+    if s == n_s:
+        print("if s==n_s",s,n_s)
+        return render(request, 'home/dummy.html')
+    data = get_data()
+    q_data = data[(results[s])]
+
+    ansd2 = list(request.session['ansd2'])
+    print("quiz2 ansd2 : ",ansd2)
+
+    n = len(q_data)
+    print("q_data n : ",q_data,n)
+    n_a = len(ansd2)
+    n_u = c - n_a - 1
+    pa = n_a * 100 / n
+    pu = n_u * 100 / n
+     ### c questions are done
+    ### make a code for c 'th question
+    progress = int((c-1)/(n)*100)
+    progress2 = int((s)*100/n_s)
+
+    if n < c:
+        print("n<c",n,c)
+        code =  ''
+        request.session['s'] += 1
+        request.session['c'] = 1
+        request.session['ansd2'] = list('')
+
+        if (s+1) == n_s:
+            print("n<c s+1 == n_s",s,n_s)
+            return render(request, 'home/dummy.html')
+
+        s = request.session['s']
+        scene = get_scene()[(results[s])]
+        return render(request, 'home/scenario.html', {'scene':scene, 's':int(s+1)})
+    else:
+        print("final else Code :")
+        code = '''
+                    <div class="">
+                    <div class=""><div class="">
+                    <p>
+                    <br>''' + q_data[str(int(c))]['q'] + '''
+                    <br><br>
+                    1. ''' + q_data[str(int(c))]['V'] + ''':<br><br>
+                         <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range" id="slider1" name="rangeInput1" min="0" max="100" value=0
+                                onchange="updateTextInput1(this.value);">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent1">0</span>%
+                            </div>
+                        </div>
+                        
+
+                      <br>
+                    2. ''' + q_data[str(int(c))]['A'] + ''':<br><br>
+                        <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range" id="slider2" name="rangeInput2" min="0" max="100" value=0
+                                onchange="updateTextInput2(this.value);" style="width:100%">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent2">0</span>%
+                            </div>
+                        </div>
+                    3. ''' + q_data[str(int(c))]['K'] + ''':<br><br>
+                        <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range"  id="slider3" name="rangeInput3" min="0" max="100" value=0
+                                onchange="updateTextInput3(this.value);">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent3">0</span>%
+                            </div>
+                        </div>
+
+                    <br>
+                    <input type="submit" value="Submit"  style="color:#ffffff; width:40%;  background: #88B2F0; display: inline-block;">
+                    </div>
+
+                    </p>
+                    </div></div></div>
+                    
+                    '''
+
+        # if float(c/n) > 0.1:
+        exit = '''
+              <input type="submit" name="action" value="skip"  style="color:#ffffff; margin-left: 10px; width:20%; background: #88B2F0; display: inline-block;">
+              <input type="submit" name="action" value="exit"  style="color:#ffffff; width:20%; background: #88B2F0; display: inline-block;"> '''
+        # else:
+            # exit = ''
+
+        return render(request, 'home/quiz2.html', {'content': mark_safe(code), 'progress':progress, 'progress2':progress2, 'q':int(c), 'exit': mark_safe(exit), 'pa':pa, 'pu':pu})
+    return HttpResponse('404!')
+def feedback(request):
+    return render(request, 'home/feedback.html')
+
+def moderator(request):
+    return HttpResponse('feedback and new questions here')
+
+def reattempt(request):
+    s = request.session['s2']
+    data = get_data()
+    sdata = data[str(s)]
+
+    n = len(sdata)
+
+    c = request.session['c2']
+
+
+    ##### Jumps and Exits
+
+    try:
+        if request.POST['action']:
+            if request.POST['action'] == 'skip':
+                
+                code =  ''
+                request.session['s'] += 1
+                request.session['c'] = 1
+
+                if (s+1) == n_s:
+                    return render(request, 'home/dummy.html')
+
+                s = request.session['s']
+                scene = get_scene()[(results[s])]
+                return render(request, 'home/scenario.html', {'scene':scene, 's':int(s+1)})
+
+            elif request.POST['action'] == 'exit':
+                return render(request, 'home/dummy.html')
+    except:
+        a = 0
+
+    #####
+    # --------------------- #
+    ##### Processing results
+
+    try:
+        responses = list(request.session['responses'])
+        answers = list(request.POST.values())
+        answers = answers[1:]
+
+        if len(answers) != 1:
+            answers = [int(float(i)) for i in answers]
+            if answers[0] == answers[1] == answers[2] == 0:
+                unans = list(request.session['unanswered'])
+                li = [s, int(int(c)-1)]
+                unans.append(li)
+                request.session['unanswered'] = unans
+            else:
+                ansd = list(request.session['ansd'])
+                li = [str(s), int(int(c)-1)]
+                ansd.append(li)
+                request.session['ansd'] = ansd
+
+        responses.append(answers)
+        request.session['responses'] = responses
+        print(ansd)
+
+    except:
+        a = 0
+
+    #####
+
+
+    if n < c:
+        return render(request, 'home/dummy.html')
+    else:
+        qdata = sdata[str(c)]
+        progress = int((c-1)/(n)*100)
+
+        q, V, A, K = qdata['q'], qdata['V'], qdata['A'], qdata['K']
+
+        code = '''
+                <div class="">
+                <div class=""><div class="">
+                <p>
+                <br>''' + q + '''
+                <br><br>
+                1. ''' + V + ''':<br><br>
+                         <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range" id="slider1" name="rangeInput1" min="0" max="100" value=0
+                                onchange="updateTextInput1(this.value);">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent1">0</span>%
+                            </div>
+                        </div>
+                        
+
+                      <br>
+
+                2. ''' + A + ''':<br><br>
+                        <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range" id="slider2" name="rangeInput2" min="0" max="100" value=0
+                                onchange="updateTextInput2(this.value);" style="width:100%">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent2">0</span>%
+                            </div>
+                        </div>
+                3. ''' + K + ''':<br><br>
+                        <div class="form-group row">
+                            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                                <input type="range"  class="form-control-range"  id="slider3" name="rangeInput3" min="0" max="100" value=0
+                                onchange="updateTextInput3(this.value);">
+                            </div>
+                            <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+                             <span  id="percent3">0</span>%
+                            </div>
+                        </div>
+
+                    <br>
+                <input type="submit" class='login_btn' value="Submit"  style="color:#ffffff; width:40%;  background: #88B2F0; display: inline-block;">
+                    </div>
+
+                    </p>
+                    </div></div></div>
+                '''
+
+        # if float(c/n) > 0.1:
+        exit = '''
+               <input type="submit" name="action" value="skip"  style="color:#ffffff; margin-left: 10px; width:20%; background: #88B2F0; display: inline-block;">
+              <input type="submit" name="action" value="exit"  style="color:#ffffff; width:20%; background: #88B2F0; display: inline-block;"> '''
+        # else:
+        #     exit = ''
+
+        request.session['c2'] = int(request.session['c2']) + 1
+
+    return render(request, 'home/reattempt.html', {'content': mark_safe(code), 'progress':progress, 'q':int(c), 'exit': mark_safe(exit)})
+
+def comeback(request, pk):
+
+    ### Get session details
+    CLOUDANT_USERNAME="apikey-v2-1mfs4kqo2nmnc2sdtgp9ji8myznbgm6mivk0o93pfopt"
+    CLOUDANT_PASSWORD="f70c9a73c52d287d3271ddc3dba6a30a"
+
+    authenticator = IAMAuthenticator("C8J8TcTL_T9YlMtyA6itWueAqAdkgGXbwOc8RA2omfCd")
+    service = CloudantV1(authenticator=authenticator)
+    service.set_service_url("https://apikey-v2-1mfs4kqo2nmnc2sdtgp9ji8myznbgm6mivk0o93pfopt:f70c9a73c52d287d3271ddc3dba6a30a@dc1a5ff5-996b-475c-8b7e-da87f4bf33a3-bluemix.cloudantnosqldb.appdomain.cloud")
+    response = service.get_server_information().get_result()
+
+    response = service.get_document(
+      db='usessions',
+      doc_id=str(pk)
+    ).get_result()
+
+    ### Create new sessions
+    request.session['s'] = response['s']
+    request.session['c'] = response['c']
+    request.session['responses'] = response['responses']
+    request.session['results'] = response['results']
+    request.session['ansd'] = response['ansd']
+    request.session['ansd2'] = response['ansd2']
+    request.session['unanswered'] = response['unans']
+
+    return redirect('home:quiz2')
+    #return render(request, 'home/comeback.html', {'pc':[pk, response]})
+
+def view_feedback(request):
+    
+    feed1=request.GET['feed1']
+    print("------------------------------------------------------")
+    print(feed1)
+    # response = service.get_document(db='usessions', document=sessions_doc).get_result()
+    # print(response)
+    from cloudant.client import Cloudant
+    from cloudant.error import CloudantException
+    from cloudant.result import Result, ResultByKey
+    client = Cloudant.iam("e9a1474d-2a68-4b11-b60c-a60c87c061a9-bluemix","oUFFwB9qB-SghbaQbaj7y7TSu7N4yS3mWrDdyYHxtjJn",connect=True)
+    client.connect()
+
+    if "datapls" in client:
+            db = client["datapls"]
+    else:
+        db = client.create_database("datapls")
+        
+    input_data = {
+            "feedback":str(feed1)
+        }
+    print(input_data)
+    db.create_document(input_data)
+
+    return render(request, 'home/view_feedback.html')
+    # return "helloworld"
+
+def revisit(request):
+    letters = string.ascii_letters
+    passcode = str( ''.join(random.choice(letters) for i in range(10)) )
+
+    # data upload
+    CLOUDANT_USERNAME="apikey-v2-1mfs4kqo2nmnc2sdtgp9ji8myznbgm6mivk0o93pfopt"
+    CLOUDANT_PASSWORD="f70c9a73c52d287d3271ddc3dba6a30a"
+    # CLOUDANT_USERNAME="e9a1474d-2a68-4b11-b60c-a60c87c061a9-bluemix"
+    # CLOUDANT_PASSWORD="f70c9a73c52d287d3271ddc3dba6a30a"
+
+
+    # authenticator = IAMAuthenticator("C8J8TcTL_T9YlMtyA6itWueAqAdkgGXbwOc8RA2omfCd")
+    # service = CloudantV1(authenticator=authenticator)
+    # service.set_service_url("https://apikey-v2-1mfs4kqo2nmnc2sdtgp9ji8myznbgm6mivk0o93pfopt:f70c9a73c52d287d3271ddc3dba6a30a@dc1a5ff5-996b-475c-8b7e-da87f4bf33a3-bluemix.cloudantnosqldb.appdomain.cloud")
+    # response = service.get_server_information().get_result()
+
+    authenticator = IAMAuthenticator("C8J8TcTL_T9YlMtyA6itWueAqAdkgGXbwOc8RA2omfCd")
+    service = CloudantV1(authenticator=authenticator)
+    service.set_service_url("https://apikey-v2-1mfs4kqo2nmnc2sdtgp9ji8myznbgm6mivk0o93pfopt:f70c9a73c52d287d3271ddc3dba6a30a@dc1a5ff5-996b-475c-8b7e-da87f4bf33a3-bluemix.cloudantnosqldb.appdomain.cloud")
+    response = service.get_server_information().get_result()
+
+    products_doc = Document(
+      id="001",
+      data = get_data()
+      )
+
+    sessions_doc = Document(
+      id = passcode,
+      s = request.session['s'],
+      c = request.session['c'],
+      responses = request.session['responses'],
+      results = request.session['results'],
+      ansd = request.session['ansd'],
+      ansd2 = request.session['ansd2'],
+      unans = request.session['unanswered']
+      )
+
+    response = service.post_document(db='usessions', document=sessions_doc).get_result()
+    print(response)
+
+    link = 'http://127.0.0.1:8000/comeback/' + passcode
+
+    return render(request, 'home/revisit.html', {'link':link})
+
+def preresults(request):
+    if request.method == 'POST':
+        s = request.POST['act']
+        data = get_data()
+        data = data[str(s)]
+        request.session['c2'] = 1
+        request.session['s2'] = s
+        return render(request, 'home/dummy2.html')
+    else:
+        responses = list(request.session['responses'])
+        responses = [i for i in responses if i != ['']]
+        responses = [i for i in responses if i != ['skip']]
+        responses = [i for i in responses if i != ['exit']]
+
+        res = [sum(i)/len(responses) for i in zip(*responses)]
+
+        ansd = list(request.session['ansd'])
+        ansd = [i for i in ansd if i != ['']]
+        ansd = [i for i in ansd if i != ['skip']]
+        ansd = [i for i in ansd if i != ['exit']]
+
+        tlist = []
+        data = get_data()
+
+        results = request.session['results']
+        n_s = len(results) # no of scenarios selected
+
+        for x in results:
+            q_data = data[x]
+            n = len(q_data)
+            for y in range(1, n+1):
+                tlist.append([x, y])
+
+        x, y = tlist, ansd
+
+        for i in x[:]:
+          if i in y:
+              x.remove(i)
+              y.remove(i)
+
+        unansd = tlist
+
+        print(unansd)
+
+        tp = []
+        un_sec = {} #unanswered sections
+        for i in unansd:
+            tp.append(int(i[0]))
+
+        tp = list(set(tp))
+
+        ##### finding lengths of tp
+        data = get_data()
+        leng = {}
+        for i in tp:
+            n = len(data[str(i)])
+            leng[str(i)] = n
+        #####
+
+        for i in tp:
+            # i is the section number
+            un_sec[str(i)] = []
+            for j in unansd:
+                if j[0] == str(i):
+                    un_sec[str(i)].append(j[1])
+
+        uns_p = {}
+        for i in tp:
+            un_p = len(un_sec[str(i)]) / float(leng[str(i)])
+            un_p = int(un_p * 100)
+            uns_p[str(i)] = un_p
+
+        print(uns_p)
+
+        ##### Generarting code #####
+
+        code = '<br><br><br>'
+
+        for i in tp:
+            code = code + 'You have not answered ' + str(uns_p[str(i)]) + '% of section ' + str(str(i)) + '. Revisit Section? <input type="submit" class="login-btn"  name="act" style="color:#ffffff; width:50%; background: #88B2F0" value="'+str(str(i))+'"> <br><br>'
+        code = code + '<br><br>'
+
+        cont = ''' Proceed to view results? <br> <input type="submit" style="color:#ffffff; width:50%; background: #88B2F0" class="login-btn" name="continue" value="View Results"> '''
+
+        return render(request, 'home/preresults.html', {'V':int(res[0]), 'A':int(res[1]), 'K':int(res[2]), 'code':mark_safe(code), 'continue':mark_safe(cont)})
+
+    return render(request, 'home/preresults.html')
